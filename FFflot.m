@@ -35,51 +35,48 @@ FlMaxPRED = [5 3 inf 1 4 2];
 % Vecteur de flot courant phi
 phi = zeros(1,m);
 %
-% MARQUES est une matrice indiquant si les sommets sont marqués ou non
-%   -> MARQUES(1, i) indique si le sommet i est marqué
-%   -> MARQUES(2, i) indique quel est le sommet qui a permis de marquer i
-MARQUES = zeros(2,n);
-MARQUES(:,2) = [ +1; 1 ]; % on marque le sommet a == 2 ( b == 1 (b,a) == 1)
-%
-% NONMARQUES contient la liste des sommets non marqués
-NONMARQUES = X(MARQUES(1,:)==0);
+% MARQUE est une matrice indiquant si les sommets sont marqués ou non
+% Le marquage indique si une amélioration du flux est possible
+%   -> MARQUE(1, i) indique si le sommet i est marqué
+%   -> MARQUE(2, i) indique quel est le sommet qui a permis de marquer i
+MARQUE = zeros(2,n);
+MARQUE(:,2) = [ +1; 1 ]; % on marque le sommet a == 2 ( b == 1 (b,a) == 1)
 %
 %% Algorithme de FF
-while true% ismember(1,NONMARQUES) % Tant que b == 1 non marqué, et donc que le flot n'est pas maximal
-    nonmarques_modifie = true;
-    while nonmarques_modifie % Tant que l'on marque des sommets
-        nonmarques_modifie = false;
+while MARQUE(1,1) == 0 % Tant que b == 1 non marqué, et donc que le flot n'est pas maximal
+    %% 1. Trouver un chemin qui permet d'améliorer le flux
+    marquage_en_cours = true;
+    while marquage_en_cours % Tant que l'on marque des sommets
+        marquage_en_cours = false;
         
         % Pour chaque sommet marqué u non encore traité
-        for u=find(MARQUES(1,:)~=0)
+        for u=find(MARQUE(1,:)~=0)
             prsuc = sum(NSUC(1:u-1)) + 1; % prsuc contient l'indice du 1er successeur de u dans SUC
             for indV = prsuc:prsuc+NSUC(u)-1 % Pour chaque arc (u,v)
                 v = SUC(indV);
-                if ismember(v,NONMARQUES) && phi(indV) < FlMaxSUC(indV) % Si v n'est pas marqué et (u,v) non saturé
-                    MARQUES(:,v) = [ +1; u ];
-                    NONMARQUES = X(MARQUES(1,:)==0);
-                    nonmarques_modifie = true;
+                if MARQUE(1,v)==0 && phi(indV) < FlMaxSUC(indV) % Si v n'est pas marqué et (u,v) non saturé, alors marquer le sommet
+                    MARQUE(:,v) = [ +1; u ];
+                    marquage_en_cours = true;
                 end
             end
             
             prpred = sum(NPRED(1:u-1)) + 1; % prpred contient l'indice du 1er prédécesseur de u dans PRED
             for indV = prpred:prpred+NPRED(u)-1 % Pour chaque arc (v,u)
                 v = PRED(indV);
-                if ismember(v,NONMARQUES) && phi(indV) ~= 0 % Si v n'est pas marqué et (u,v) a un flot non nul (donc (v,u) non saturé)
-                    MARQUES(:,v) = [ -1; u ];
-                    NONMARQUES = X(MARQUES(1,:)==0);
-                    nonmarques_modifie = true;
+                if MARQUE(1,v)==0 && 0 < phi(indV) && FlMaxPRED(indV) < inf % Si v n'est pas marqué et (u,v) a un flot non nul (donc (v,u) non saturé), alors marquer le sommet
+                    MARQUE(:,v) = [ -1; u ];
+                    marquage_en_cours = true;
                 end
             end
         end
     end
     
     %% 2. Mise à jour du flot courant phi si non maximal
-    if MARQUES(1,1) == 0 % Si le puits n'est pas marqué, le flot est maximal
+    if MARQUE(1,1) == 0 % Si le puits n'est pas marqué, le flot est maximal
         break;
     else
         % Trouver le chemin marqué
-        chemin = ComputeWay(MARQUES, SUC, NSUC);
+        chemin = ComputeWay(MARQUE, SUC, NSUC);
         
         % Augmenter le flot
         alpha = inf;
@@ -99,16 +96,9 @@ while true% ismember(1,NONMARQUES) % Tant que b == 1 non marqué, et donc que le
             phi(indArc) = phi(indArc) + alpha * chemin(1,i);
         end
         
-        % -> Ne plus marquer les sommets avec des arcs non saturés
-%         arcsNonSatures = find(FlMaxSUC-phi ~= 0);
-%         sommetsADemarquer = SUC(arcsNonSatures);
-%         NONMARQUES(sommetsADemarquer) = true;
-%         MARQUES(1,sommetsADemarquer) = 0;
-        MARQUES = zeros(2,n);
-        MARQUES(:,2) = [ +1; 1 ]; % on marque le sommet a == 2 ( b == 1 (b,a) == 1)
-        %
-        % NONMARQUES contient la liste des sommets non marqués
-        NONMARQUES = X(MARQUES(1,:)==0);
+        % -> Ne plus marquer aucun sommet à part le sommet de départ
+        MARQUE = zeros(2,n);
+        MARQUE(:,2) = [ +1; 1 ];
     end
 end
 %% 3. Post-traitement : affichage du flot
